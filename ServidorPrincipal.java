@@ -16,9 +16,6 @@ public class ServidorPrincipal {
     // armazena temporariamente as respostas dos servidores de arquivos por solicitação
     private static final Map<String, CopyOnWriteArrayList<String>> respostasPorArquivo =
             new ConcurrentHashMap<>();
-    // gera ID único por solicitação (baseado no nome do arquivo + timestamp)
-    private static final Map<String, String> idSolicitacaoPorArquivo = new ConcurrentHashMap<>();
-
 
     private static class ClienteHandler implements Runnable{
         private final Socket socket;
@@ -39,8 +36,7 @@ public class ServidorPrincipal {
                 System.out.println("Cliente " + socket.getInetAddress() + " solicitou: " + nomeArquivo);
 
                 // Gera um ID único para essa solicitação
-                String idSolicitacao = nomeArquivo + "_" + System.currentTimeMillis();
-                idSolicitacaoPorArquivo.put(nomeArquivo, idSolicitacao);
+                String idSolicitacao = nomeArquivo + "_" + System.nanoTime() + "_" + new java.util.Random().nextInt(1000);
                 respostasPorArquivo.put(idSolicitacao, new CopyOnWriteArrayList<>());
 
                 enviarPerguntaMulticast(nomeArquivo, idSolicitacao);
@@ -59,10 +55,7 @@ public class ServidorPrincipal {
                     out.println(resposta);
                     System.out.println("Enviada lista com " + servidoresComArquivo.size() + " servidor(es) para o cliente.");
                 }
-
-                // Limpeza
                 respostasPorArquivo.remove(idSolicitacao);
-                idSolicitacaoPorArquivo.remove(nomeArquivo);
             } catch (Exception e) {
                 System.err.println("Erro ao tratar cliente: " + e.getMessage());
             } finally {

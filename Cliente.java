@@ -18,8 +18,7 @@ public class Cliente {
     private static void baixarArquivo(String ip, int porta, String nomeArquivo) {
         try (Socket socket = new Socket(ip, porta);
              PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-             DataInputStream dataIn = new DataInputStream(socket.getInputStream());
-             FileOutputStream fos = new FileOutputStream("download_" + nomeArquivo)) {
+             DataInputStream dataIn = new DataInputStream(socket.getInputStream())) {
 
             out.println(nomeArquivo);
             long tamanho = dataIn.readLong();
@@ -28,6 +27,7 @@ public class Cliente {
                 System.out.println("Arquivo não encontrado neste servidor.\n");
                 return;
             }
+            FileOutputStream fos = new FileOutputStream("download_" + nomeArquivo);
 
             System.out.println("Baixando " + nomeArquivo + " (" + tamanho + " bytes) de " + ip + ":" + porta + "...");
             byte[] buffer = new byte[8192];

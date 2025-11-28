@@ -11,9 +11,14 @@ public class ServidorArquivo {
     private static final int portaTCP = 7000;
 
     private static void escutarMulticast(int portaTCP) {
-        try (MulticastSocket socket = new MulticastSocket(portaMulticast)) {
+        MulticastSocket socket = null;
+        try {
+            socket = new MulticastSocket(null);
+            socket.setReuseAddress(true);
+            socket.bind(new InetSocketAddress(portaMulticast));
+
             InetAddress group = InetAddress.getByName(ipMulticast);
-            socket.joinGroup(group);
+            socket.joinGroup(new InetSocketAddress(group, portaMulticast), null);
 
             byte[] buffer = new byte[1024];
             while (true) {
@@ -28,7 +33,7 @@ public class ServidorArquivo {
 
                     Path caminho = Paths.get(diretorio, nomeArquivo);
                     if (Files.exists(caminho) && Files.isRegularFile(caminho)) {
-                        responderQueTemArquivo(socket, group, idSolicitacao, nomeArquivo);
+                        responderQueTemArquivo(socket, group, idSolicitacao, portaTCP);
                     }
                 }
             }
@@ -38,15 +43,17 @@ public class ServidorArquivo {
     }
 
 
-    private static void responderQueTemArquivo(MulticastSocket socket, InetAddress group, String idSolicitacao, String nomeArquivo) throws IOException {
-        // Usa o IP local real (importante em simulação com várias instâncias na mesma máquina)
-        String ipLocal = InetAddress.getLocalHost().getHostAddress();
+    private static void responderQueTemArquivo(MulticastSocket socket, InetAddress group, String idSolicitacao, int portaTCP) throws IOException {
+        try {
+            String ipLocal = InetAddress.getLocalHost().getHostAddress(); // Usa o IP local real (importante em simulação com várias instâncias na mesma máquina)
+            String resposta = "Resposta:" + idSolicitacao + ":" + ipLocal + ":" + portaTCP;
 
-        String resposta = "Resposta:" + idSolicitacao + ":" + ipLocal + ":" + portaTCP;
-        byte[] buffer = resposta.getBytes();
-
-        DatagramPacket packet = new DatagramPacket(buffer, buffer.length, group, portaMulticast);
-        socket.send(packet);
+            byte[] buffer = resposta.getBytes();
+            DatagramPacket packet = new DatagramPacket(buffer, buffer.length, group, portaMulticast);
+            socket.send(packet);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
 
@@ -94,31 +101,39 @@ public class ServidorArquivo {
 
 
     public static void main(String[] args) throws IOException {
-        String id = (args.length > 0) ? args[0] : "";
-        diretorio = id.isEmpty() ? "arquivos_servidor" : "arquivos_servidor_" + id;
+        int PortaTCPAtual = portaTCP;
+        if (args.length > 1) {
+            PortaTCPAtual = Integer.parseInt(args[1]);
+        } else {
+            for (int tentativa = 0; tentativa < 5; tentativa++) {
+                try (ServerSocket test = new ServerSocket(PortaTCPAtual)) {
+                    break; //
+                } catch (IOException e) {
+                    PortaTCPAtual++;
+                }
+            }
+        }
+        final int PortaTCPFinal = PortaTCPAtual;
 
+        String id = (args.length > 0) ? args[0] : String.valueOf(PortaTCPFinal);
+        diretorio = "arquivos_servidor_" + id;
         Path dir = Paths.get(diretorio);
         if (!Files.exists(dir)) {
             Files.createDirectories(dir);
             System.out.println("Pasta criada: " + dir.toAbsolutePath());
         }
 
-        int portaTcp = portaTCP;
-        if (args.length > 1) {
-            portaTcp = Integer.parseInt(args[1]);
-        }
-        final int PORTA_TCP = portaTcp;
-
         Files.createDirectories(Paths.get(diretorio));
         System.out.println("=== Servidor de Arquivo iniciado ===");
+        System.out.println("Endereço : " + InetAddress.getLocalHost().getHostAddress() + ":" + PortaTCPAtual);
         System.out.println("Arquivos disponíveis:");
         Files.list(Paths.get(diretorio))
                 .filter(Files::isRegularFile)
                 .forEach(p -> System.out.println("  → " + p.getFileName()));
         System.out.println("=====================================\n");
 
-        new Thread(() -> escutarMulticast(PORTA_TCP)).start();
-        try (ServerSocket serverSocket = new ServerSocket(PORTA_TCP)) {
+        new Thread(() -> escutarMulticast(PortaTCPFinal)).start();
+        try (ServerSocket serverSocket = new ServerSocket(PortaTCPAtual)) {
             while (true) {
                 Socket clienteSocket = serverSocket.accept();
                 new Thread(new DownloadHandler(clienteSocket)).start();

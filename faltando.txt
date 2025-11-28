@@ -1,2 +1,0 @@
-1. Fazer com que funcione com várias servidores e solicitações simultâneas
-2. Resolver a questão do dowload só quando encerra o cliente
